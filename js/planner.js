@@ -75,7 +75,7 @@ export function buildGraphData(node) {
         from: myId, to: parentId,
         label: rate + '/min',
         arrows: 'to',
-        font: { size: 9, color: '#4b5563', face: 'Share Tech Mono', align: 'middle' },
+        font: { size: 9, color: '#4b5568', face: 'Share Tech Mono', align: 'middle' },
         color: { color: '#2a3045', highlight: '#60a5fa' },
         width: 1.5,
       });
