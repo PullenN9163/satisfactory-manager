@@ -1,4 +1,4 @@
-import { getDefaultRecipe, getRecipesForItem, RECIPES } from './data/recipes.js';
+import { getDefaultRecipe, RECIPES } from './data/recipes.js';
 
 export function buildChain(itemName, ratePerMin, recipeSelections = {}, _visiting = new Set()) {
   if (_visiting.has(itemName)) {
