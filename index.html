@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Satisfactory">
+<meta name="theme-color" content="#0c0e13">
+<title>Satisfactory Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-status">
+    <div class="status-dot"></div>
+    <span class="header-label">FICSIT Employee Portal</span>
+  </div>
+  <h1>SATISFACTORY</h1>
+  <div class="header-sub">Manager — <span id="sync-status">Connecting...</span></div>
+</div>
+
+<div class="tabs" id="main-tabs">
+  <button class="tab-btn active" data-tab="recipes">RECIPES</button>
+  <button class="tab-btn" data-tab="factories">FACTORIES</button>
+  <button class="tab-btn tab-btn-new" data-tab="new">+ NEW</button>
+</div>
+
+<div id="main-view">
+  <div id="recipes-panel" class="content"></div>
+  <div id="factories-panel" class="content hidden"></div>
+</div>
+
+<!-- NEW FACTORY MODAL -->
+<div id="new-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">NEW FACTORY GUIDE</span>
+      <button class="modal-close" id="modal-close">X</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">FACTORY NAME</label>
+      <input type="text" id="new-name" class="modal-input" placeholder="e.g. Rotor Factory" autocomplete="off">
+      <label class="field-label" style="margin-top:14px;">OUTPUT ITEM</label>
+      <input type="text" id="new-item-search" class="modal-input" placeholder="Search items..." autocomplete="off" autocorrect="off">
+      <div id="new-item-results" class="item-results hidden"></div>
+      <input type="hidden" id="new-item-value">
+      <label class="field-label" style="margin-top:14px;">TARGET RATE (per min)</label>
+      <input type="number" id="new-rate" class="modal-input" placeholder="e.g. 10" min="0.1" step="0.1">
+      <button id="new-submit" class="submit-btn">CREATE FACTORY</button>
+    </div>
+  </div>
+</div>
+
+<!-- FACTORY DETAIL VIEW (full-screen overlay, slides in from right) -->
+<div id="detail-view" class="hidden">
+  <div class="detail-header">
+    <button class="back-btn" id="back-btn">BACK</button>
+    <div class="detail-title-wrap">
+      <div class="detail-title" id="detail-title"></div>
+      <div class="detail-subtitle" id="detail-subtitle"></div>
+    </div>
+  </div>
+  <div class="tabs" id="detail-tabs">
+    <button class="tab-btn active" data-subtab="plan">PLAN</button>
+    <button class="tab-btn" data-subtab="graph">GRAPH</button>
+    <button class="tab-btn" data-subtab="todo">TO-DO</button>
+  </div>
+  <div id="plan-panel" class="content"></div>
+  <div id="graph-panel" class="content hidden">
+    <div id="graph-container"></div>
+  </div>
+  <div id="todo-panel" class="content hidden"></div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
