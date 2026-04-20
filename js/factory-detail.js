@@ -1,0 +1,257 @@
+﻿import { buildChain, flattenMachines, flattenRawResources, buildGraphData } from './planner.js';
+import { getRecipesForItem, RECIPES } from './data/recipes.js';
+import { appData, updateRecipeSelections, updateTodos } from './firebase.js';
+import { renderGraph, destroyGraph } from './graph.js';
+
+const RECIPES_BY_ID = Object.fromEntries(RECIPES.map(r => [r.id, r]));
+let currentFactory = null;
+let currentSubTab = 'plan';
+let todoPriority = 'low';
+let todoFilter = 'active';
+
+export function openFactory(factory) {
+  currentFactory = factory;
+  currentSubTab = 'plan';
+  document.getElementById('detail-title').textContent = factory.name;
+  document.getElementById('detail-subtitle').textContent = factory.outputItem + ' - ' + factory.outputRate + '/min';
+  const detail = document.getElementById('detail-view');
+  detail.classList.remove('hidden');
+  requestAnimationFrame(() => detail.classList.add('visible'));
+  wireSubTabs();
+  switchSubTab('plan');
+}
+
+export function closeFactory() {
+  const detail = document.getElementById('detail-view');
+  detail.classList.remove('visible');
+  destroyGraph();
+  setTimeout(() => detail.classList.add('hidden'), 300);
+  currentFactory = null;
+}
+
+export function refreshDetail() {
+  if (!currentFactory) return;
+  const updated = appData.factories[currentFactory.id];
+  if (updated) {
+    currentFactory = updated;
+    document.getElementById('detail-subtitle').textContent = updated.outputItem + ' - ' + updated.outputRate + '/min';
+  }
+  renderSubTab(currentSubTab);
+}
+
+function wireSubTabs() {
+  document.querySelectorAll('#detail-tabs .tab-btn').forEach(btn => {
+    const fresh = btn.cloneNode(true);
+    btn.parentNode.replaceChild(fresh, btn);
+    fresh.addEventListener('click', () => {
+      document.querySelectorAll('#detail-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+      fresh.classList.add('active');
+      currentSubTab = fresh.dataset.subtab;
+      renderSubTab(currentSubTab);
+    });
+  });
+  document.querySelector('#detail-tabs [data-subtab="plan"]').classList.add('active');
+}
+
+function switchSubTab(tab) {
+  currentSubTab = tab;
+  ['plan','graph','todo'].forEach(t => document.getElementById(t + '-panel').classList.toggle('hidden', t !== tab));
+  renderSubTab(tab);
+}
+
+function renderSubTab(tab) {
+  ['plan','graph','todo'].forEach(t => document.getElementById(t + '-panel').classList.toggle('hidden', t !== tab));
+  if (tab === 'plan') renderPlan();
+  if (tab === 'graph') renderGraphTab();
+  if (tab === 'todo') renderTodo();
+}
+
+// PLAN
+
+function renderPlan() {
+  if (!currentFactory) return;
+  const f = currentFactory;
+  const chain = buildChain(f.outputItem, f.outputRate, f.recipeSelections || {});
+  const machines = flattenMachines(chain);
+  const rawRes = flattenRawResources(chain);
+  const panel = document.getElementById('plan-panel');
+
+  const machineRows = machines.map(m =>
+    '<div class="summary-row"><span class="summary-machine">' + esc(m.machine) + '</span><span class="summary-count">x' + m.count.toFixed(2) + '</span></div>'
+  ).join('');
+  const rawRows = rawRes.map(r =>
+    '<div class="summary-row"><span class="summary-resource">' + esc(r.item) + '</span><span class="summary-rate">' + r.ratePerMin.toFixed(2) + '/min</span></div>'
+  ).join('');
+
+  panel.innerHTML = '<div id="tree-root"></div>'
+    + '<div class="summary-box"><div class="summary-title">MACHINES NEEDED</div>' + machineRows + '</div>'
+    + '<div class="summary-box"><div class="summary-title">RAW RESOURCES</div>' + rawRows + '</div>';
+
+  buildTreeDOM(chain, document.getElementById('tree-root'), true, f);
+}
+
+function buildTreeDOM(node, container, isRoot, factory) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'tree-node';
+
+  const item = document.createElement('div');
+  item.className = 'tree-item' + (isRoot ? ' root' : '') + (node.isRaw ? ' raw' : '');
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'tree-item-name';
+  nameSpan.textContent = node.itemName;
+
+  const rateSpan = document.createElement('span');
+  rateSpan.className = 'tree-rate';
+  rateSpan.textContent = node.ratePerMin.toFixed(2) + '/min';
+
+  item.appendChild(nameSpan);
+  item.appendChild(rateSpan);
+
+  if (!node.isRaw) {
+    const alts = getRecipesForItem(node.itemName);
+    if (alts.length > 1) {
+      const sel = document.createElement('select');
+      sel.className = 'recipe-select';
+      const currentSel = (factory.recipeSelections || {})[node.itemName] || '';
+      if (currentSel && RECIPES_BY_ID[currentSel] && RECIPES_BY_ID[currentSel].alt) {
+        sel.classList.add('alt');
+      }
+      const defaultOpt = document.createElement('option');
+      defaultOpt.value = '';
+      defaultOpt.textContent = 'Default';
+      sel.appendChild(defaultOpt);
+      alts.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = r.name;
+        if (currentSel === r.id) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener('change', () => {
+        const newSels = Object.assign({}, factory.recipeSelections || {});
+        if (sel.value) newSels[node.itemName] = sel.value; else delete newSels[node.itemName];
+        updateRecipeSelections(factory.id, newSels);
+      });
+      sel.addEventListener('click', e => e.stopPropagation());
+      item.appendChild(sel);
+    }
+  }
+
+  wrapper.appendChild(item);
+  if (node.children && node.children.length) {
+    const childDiv = document.createElement('div');
+    childDiv.className = 'tree-children';
+    node.children.forEach(child => buildTreeDOM(child, childDiv, false, factory));
+    wrapper.appendChild(childDiv);
+  }
+  container.appendChild(wrapper);
+}
+
+// GRAPH
+
+function renderGraphTab() {
+  if (!currentFactory) return;
+  const chain = buildChain(currentFactory.outputItem, currentFactory.outputRate, currentFactory.recipeSelections || {});
+  const graphData = buildGraphData(chain);
+  setTimeout(() => renderGraph('graph-container', graphData), 50);
+}
+
+// TO-DO
+
+function renderTodo() {
+  if (!currentFactory) return;
+  const todos = currentFactory.todos || [];
+  const panel = document.getElementById('todo-panel');
+  const done = todos.filter(t => t.done).length;
+
+  panel.innerHTML = '<div class="stats-row">'
+    + '<div class="stat-box"><div class="stat-box-val" id="td-total" style="color:var(--amber)">' + todos.length + '</div><div class="stat-box-label">TOTAL</div></div>'
+    + '<div class="stat-box"><div class="stat-box-val" id="td-done" style="color:var(--green)">' + done + '</div><div class="stat-box-label">DONE</div></div>'
+    + '<div class="stat-box"><div class="stat-box-val" id="td-left" style="color:var(--blue)">' + (todos.length - done) + '</div><div class="stat-box-label">LEFT</div></div>'
+    + '</div>'
+    + (todos.length > 0 ? '<div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:' + Math.round(done/todos.length*100) + '%"></div></div><div class="progress-text">' + Math.round(done/todos.length*100) + '% complete</div></div>' : '')
+    + '<div class="add-row"><input type="text" class="todo-input" id="td-input" placeholder="e.g. Place 3 Assemblers..." autocomplete="off"><button class="add-btn" id="td-add">+</button></div>'
+    + '<div class="priority-row"><span class="priority-label">PRIORITY:</span>'
+    + ['low','medium','high'].map(p => '<button class="priority-btn' + (todoPriority === p ? ' sel-' + p : '') + '" data-pri="' + p + '">' + p.toUpperCase().slice(0,3) + '</button>').join('')
+    + '</div>'
+    + '<div class="pills" id="td-filter-pills" style="margin-bottom:12px"></div>'
+    + '<div id="td-list"></div>';
+
+  renderTodoFilter();
+  renderTodoList(todos);
+
+  panel.querySelector('#td-add').addEventListener('click', addTodo);
+  panel.querySelector('#td-input').addEventListener('keydown', e => { if (e.key === 'Enter') addTodo(); });
+  panel.querySelectorAll('.priority-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      todoPriority = b.dataset.pri;
+      panel.querySelectorAll('.priority-btn').forEach(x => x.className = 'priority-btn');
+      b.className = 'priority-btn sel-' + todoPriority;
+    });
+  });
+}
+
+function renderTodoFilter() {
+  const c = document.getElementById('td-filter-pills');
+  if (!c) return;
+  c.innerHTML = [['active','Active'],['done','Done'],['all','All']].map(([k,l]) =>
+    '<button class="pill ' + (todoFilter === k ? 'active-amber' : '') + '" data-tf="' + k + '">' + l + '</button>'
+  ).join('');
+  c.querySelectorAll('.pill').forEach(p => p.addEventListener('click', () => {
+    todoFilter = p.dataset.tf;
+    renderTodoFilter();
+    renderTodoList(currentFactory.todos || []);
+  }));
+}
+
+function renderTodoList(todos) {
+  const list = document.getElementById('td-list');
+  if (!list) return;
+  const filtered = todos.filter(t =>
+    todoFilter === 'active' ? !t.done : todoFilter === 'done' ? t.done : true
+  );
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-state"><p>' + (todoFilter === 'done' ? 'No completed tasks.' : todoFilter === 'active' ? 'All clear, Pioneer!' : 'Add your first task.') + '</p></div>';
+    return;
+  }
+  list.innerHTML = filtered.map(t =>
+    '<div class="todo-item ' + (t.done ? 'done ' : '') + 'pri-' + t.priority + '" data-tid="' + t.id + '">'
+    + '<div class="todo-check ' + (t.done ? 'checked' : '') + '" data-action="toggle" data-tid="' + t.id + '">'
+    + (t.done ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>' : '')
+    + '</div>'
+    + '<span class="todo-text">' + esc(t.text) + '</span>'
+    + '<span class="todo-pri-tag tag-' + t.priority + '">' + t.priority.slice(0,3).toUpperCase() + '</span>'
+    + '<button class="todo-delete" data-action="delete" data-tid="' + t.id + '">'
+    + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'
+    + '</button></div>'
+  ).join('');
+  list.querySelectorAll('[data-action="toggle"]').forEach(el =>
+    el.addEventListener('click', e => { e.stopPropagation(); toggleTodo(Number(el.dataset.tid)); })
+  );
+  list.querySelectorAll('[data-action="delete"]').forEach(el =>
+    el.addEventListener('click', e => { e.stopPropagation(); deleteTodo(Number(el.dataset.tid)); })
+  );
+}
+
+function addTodo() {
+  const input = document.getElementById('td-input');
+  const text = input && input.value.trim();
+  if (!text || !currentFactory) return;
+  const todos = [{ id: Date.now(), text, priority: todoPriority, done: false }, ...(currentFactory.todos || [])];
+  input.value = '';
+  updateTodos(currentFactory.id, todos);
+}
+
+function toggleTodo(id) {
+  if (!currentFactory) return;
+  const todos = (currentFactory.todos || []).map(t => t.id === id ? Object.assign({}, t, { done: !t.done }) : t);
+  updateTodos(currentFactory.id, todos);
+}
+
+function deleteTodo(id) {
+  if (!currentFactory) return;
+  updateTodos(currentFactory.id, (currentFactory.todos || []).filter(t => t.id !== id));
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
