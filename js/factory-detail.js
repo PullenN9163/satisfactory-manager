@@ -170,7 +170,7 @@ function renderTodo() {
     + '<div class="stat-box"><div class="stat-box-val" id="td-done" style="color:var(--green)">' + done + '</div><div class="stat-box-label">DONE</div></div>'
     + '<div class="stat-box"><div class="stat-box-val" id="td-left" style="color:var(--blue)">' + (todos.length - done) + '</div><div class="stat-box-label">LEFT</div></div>'
     + '</div>'
-    + (todos.length > 0 ? '<div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:' + Math.round(done/todos.length*100) + '%"></div></div><div class="progress-text">' + Math.round(done/todos.length*100) + '% complete</div></div>' : '')
+    + (todos.length > 0 ? '<div class="progress-wrap"><div class="progress-pill"><canvas id="td-progress-canvas"></canvas><div class="progress-text" id="td-progress-text"></div></div></div>' : '')
     + '<div class="add-row"><input type="text" class="todo-input" id="td-input" placeholder="e.g. Place 3 Assemblers..." autocomplete="off"><button class="add-btn" id="td-add">+</button></div>'
     + '<div class="priority-row"><span class="priority-label">PRIORITY:</span>'
     + ['low','medium','high'].map(p => '<button class="priority-btn' + (todoPriority === p ? ' sel-' + p : '') + '" data-pri="' + p + '">' + p.toUpperCase().slice(0,3) + '</button>').join('')
@@ -180,6 +180,7 @@ function renderTodo() {
 
   renderTodoFilter();
   renderTodoList(todos);
+  if (todos.length > 0) initProgressCanvas(Math.round(done / todos.length * 100));
 
   panel.querySelector('#td-add').addEventListener('click', addTodo);
   panel.querySelector('#td-input').addEventListener('keydown', e => { if (e.key === 'Enter') addTodo(); });
@@ -255,3 +256,78 @@ function deleteTodo(id) {
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+
+let _progTarget = 0, _progCurrent = 0, _progRAF = null;
+
+function initProgressCanvas(pct) {
+  _progTarget = pct;
+  if (_progRAF) return;
+  _progRAF = requestAnimationFrame(_animateProgress);
+}
+
+function _animateProgress() {
+  const canvas = document.getElementById('td-progress-canvas');
+  if (!canvas) { _progRAF = null; return; }
+
+  const diff = _progTarget - _progCurrent;
+  _progCurrent += Math.abs(diff) > 0.1 ? diff * 0.08 : diff;
+
+  const pill = canvas.parentElement;
+  const W = canvas.width = Math.round(pill.offsetWidth);
+  const H = canvas.height = Math.round(pill.offsetHeight);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const textEl = document.getElementById('td-progress-text');
+  if (textEl) textEl.textContent = Math.round(_progTarget) + '% complete';
+
+  if (_progCurrent > 0) {
+    const fillX = W * _progCurrent / 100;
+    const t = Date.now() / 1000;
+    const done = _progCurrent >= 99.5;
+    const waveAmp = done ? 0 : 3, waveFreq = 0.14;
+    const r = H / 2;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(r, 0); ctx.lineTo(W - r, 0);
+    ctx.arcTo(W, 0, W, H, r); ctx.lineTo(W, H - r);
+    ctx.arcTo(W, H, W - r, H, r); ctx.lineTo(r, H);
+    ctx.arcTo(0, H, 0, H - r, r); ctx.lineTo(0, r);
+    ctx.arcTo(0, 0, r, 0, r);
+    ctx.closePath();
+    ctx.clip();
+
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(fillX, 0);
+    for (let y = 0; y <= H + 1; y++) ctx.lineTo(fillX + Math.sin(y * waveFreq + t * 2.2) * waveAmp, y);
+    ctx.lineTo(0, H);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, 0, fillX, 0);
+    g.addColorStop(0, '#CC4400'); g.addColorStop(0.5, '#FF6A00'); g.addColorStop(1, '#FF8C30');
+    ctx.fillStyle = g; ctx.fill();
+
+    const gloss = ctx.createLinearGradient(0, 0, 0, H * 0.45);
+    gloss.addColorStop(0, 'rgba(255,255,255,0.13)'); gloss.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gloss; ctx.fillRect(0, 0, fillX, H * 0.45);
+
+    if (!done) {
+      [{bx:0.08,by:0.6,r:2,s:0.55,p:0},{bx:0.22,by:0.7,r:1.6,s:0.4,p:1.2},
+       {bx:0.38,by:0.5,r:1.8,s:0.75,p:2.1},{bx:0.55,by:0.65,r:1.3,s:0.5,p:0.7},
+       {bx:0.72,by:0.55,r:2,s:0.65,p:1.5}].forEach(b => {
+        const bx = fillX * b.bx;
+        if (bx > fillX - 4) return;
+        const rawY = b.by * H - ((t * b.s + b.p) % 1) * H;
+        ctx.beginPath(); ctx.arc(bx, ((rawY % H) + H) % H, b.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fill();
+      });
+      const eg = ctx.createLinearGradient(fillX - 10, 0, fillX + 14, 0);
+      eg.addColorStop(0, 'rgba(255,130,0,0)'); eg.addColorStop(0.5, 'rgba(255,160,60,0.5)'); eg.addColorStop(1, 'rgba(255,106,0,0)');
+      ctx.fillStyle = eg; ctx.fillRect(fillX - 10, 0, 24, H);
+    }
+    ctx.restore();
+  }
+
+  _progRAF = requestAnimationFrame(_animateProgress);
+}
