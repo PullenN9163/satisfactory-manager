@@ -1,5 +1,6 @@
 import { appData, saveFactory, deleteFactory, newId } from './firebase.js';
 import { getAllOutputItems } from './data/recipes.js';
+import { buildChain, flattenMachines } from './planner.js';
 
 let _onOpen = null;
 
@@ -14,19 +15,60 @@ export function refreshFactoriesTab(container) {
 
 function renderFactories(container) {
   const factories = Object.values(appData.factories).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  if (factories.length === 0) {
-    container.innerHTML = '<div class="factory-new-hint"><p>No factories yet.</p><p class="hint">Tap + NEW in the tab bar to create your first factory guide.</p></div>';
+  container.textContent = '';
+
+  if (!factories.length) {
+    const hint = document.createElement('div');
+    hint.className = 'factory-new-hint';
+    const p1 = document.createElement('p'); p1.textContent = 'No factories yet.';
+    const p2 = document.createElement('p'); p2.className = 'hint';
+    p2.textContent = 'Tap + NEW in the tab bar to create your first factory guide.';
+    hint.appendChild(p1); hint.appendChild(p2);
+    container.appendChild(hint);
     return;
   }
-  container.innerHTML = factories.map(f => {
+
+  factories.forEach(f => {
     const done = (f.todos || []).filter(t => t.done).length;
     const total = (f.todos || []).length;
-    return '<div class="factory-card" data-id="' + f.id + '">'
-      + '<div class="factory-name">' + esc(f.name) + '</div>'
-      + '<div class="factory-meta">' + esc(f.outputItem) + ' - ' + f.outputRate + '/min - ' + done + '/' + total + ' tasks done</div>'
-      + '<div class="factory-actions"><button class="delete-btn" data-del="' + f.id + '">DELETE</button></div>'
-      + '</div>';
-  }).join('');
+    let machines = [];
+    try { machines = flattenMachines(buildChain(f.outputItem, f.outputRate, f.recipeSelections || {})); } catch (_) {}
+
+    const card = document.createElement('div');
+    card.className = 'factory-card'; card.dataset.id = f.id;
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'factory-name'; nameEl.textContent = f.name;
+    card.appendChild(nameEl);
+
+    const metaEl = document.createElement('div');
+    metaEl.className = 'factory-meta';
+    metaEl.textContent = '\u2192 ' + f.outputItem + ' @ ' + f.outputRate + '/min'
+      + (total > 0 ? ' \xb7 ' + done + '/' + total + ' tasks' : '');
+    card.appendChild(metaEl);
+
+    if (machines.length) {
+      const chips = document.createElement('div');
+      chips.className = 'factory-chips';
+      machines.slice(0, 6).forEach(m => {
+        const chip = document.createElement('span');
+        chip.className = 'factory-chip';
+        const cnt = m.count % 1 === 0 ? m.count : m.count.toFixed(1);
+        chip.textContent = m.machine + ' \xd7' + cnt;
+        chips.appendChild(chip);
+      });
+      card.appendChild(chips);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'factory-actions';
+    const delBtn = document.createElement('button');
+    delBtn.className = 'delete-btn'; delBtn.dataset.del = f.id; delBtn.textContent = 'DELETE';
+    actions.appendChild(delBtn);
+    card.appendChild(actions);
+
+    container.appendChild(card);
+  });
 
   container.querySelectorAll('.factory-card').forEach(card => {
     card.addEventListener('click', e => {
@@ -93,4 +135,3 @@ export function initNewFactoryModal(onCreated) {
   return { open: () => modal.classList.remove('hidden') };
 }
 
-function esc(s) { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }

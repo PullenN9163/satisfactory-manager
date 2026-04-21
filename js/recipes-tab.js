@@ -1,10 +1,10 @@
 import { RECIPES, CATEGORIES, TIERS } from './data/recipes.js';
 import { appData, saveFavourites } from './firebase.js';
+import { getUnlockedTiers } from './phase-state.js';
 
 let searchQuery = '';
 let catFilter = 'All';
 let tierFilter = 'All';
-let expandedId = null;
 
 export function initRecipesTab(container) {
   container.innerHTML = buildShell();
@@ -18,6 +18,7 @@ export function initRecipesTab(container) {
 }
 
 export function refreshRecipesTab(container) {
+  renderTierPills(container);
   renderRecipes(container);
 }
 
@@ -45,7 +46,10 @@ function renderCatPills(container) {
 function renderTierPills(container) {
   const c = container.querySelector('#tier-pills');
   if (!c) return;
-  c.innerHTML = TIERS.map(t =>
+  const unlocked = getUnlockedTiers();
+  if (tierFilter !== 'All' && !unlocked.includes(tierFilter)) tierFilter = 'All';
+  const visible = TIERS.filter(t => t === 'All' || unlocked.includes(t));
+  c.innerHTML = visible.map(t =>
     '<button class="pill ' + (tierFilter === t ? 'active-blue' : '') + '" data-tier="' + esc(t) + '">' + esc(t) + '</button>'
   ).join('');
   c.querySelectorAll('.pill').forEach(p => p.addEventListener('click', () => {
@@ -55,9 +59,11 @@ function renderTierPills(container) {
 
 function renderRecipes(container) {
   const favs = appData.favourites || [];
+  const unlocked = getUnlockedTiers();
   const s = searchQuery.toLowerCase();
   const filtered = RECIPES.filter(r => {
     if (catFilter === 'Favs') return favs.includes(r.id);
+    if (!unlocked.includes(r.tier)) return false;
     const matchS = !s || r.name.toLowerCase().includes(s)
       || r.inputs.some(i => i.item.toLowerCase().includes(s))
       || r.machine.toLowerCase().includes(s);
@@ -70,44 +76,43 @@ function renderRecipes(container) {
   const list = container.querySelector('#recipe-list');
   if (!list) return;
 
-  if (filtered.length === 0) {
+  if (!filtered.length) {
     list.innerHTML = '<div class="empty-state"><p>No recipes found.</p><p class="hint">Try adjusting filters.</p></div>';
     return;
   }
 
   list.innerHTML = filtered.map(r => {
-    const open = expandedId === r.id;
     const isFav = favs.includes(r.id);
-    return '<div class="recipe-card' + (r.alt ? ' alt-recipe' : '') + (open ? ' expanded' : '') + '" data-id="' + r.id + '">'
-      + '<div class="recipe-header">'
-      + '<div class="recipe-info">'
-      + '<div class="recipe-name">' + (r.alt ? '<span class="star">*</span>' : '') + esc(r.name) + '</div>'
-      + '<div class="recipe-meta"><span class="recipe-machine">' + esc(r.machine) + '</span><span class="recipe-tier">' + esc(r.tier) + '</span></div>'
+    const isAlt = !!r.alt;
+    return '<div class="flip-wrap" data-id="' + r.id + '">'
+      + '<div class="flip-inner">'
+      + '<div class="flip-front' + (isAlt ? ' alt' : '') + '">'
+      + '<button class="flip-fav-btn' + (isFav ? ' active' : '') + '" data-fav="' + r.id + '" title="Favourite">&#9733;</button>'
+      + '<div class="flip-front-name' + (isAlt ? ' alt' : '') + '">'
+      + (isAlt ? '<span class="star">&#9733;</span>' : '') + esc(r.name) + '</div>'
+      + '<div class="flip-front-meta">'
+      + '<span class="recipe-machine">' + esc(r.machine) + '</span>'
+      + '<span class="recipe-tier">' + esc(r.tier) + '</span>'
       + '</div>'
-      + '<button class="fav-btn' + (isFav ? ' active' : '') + '" data-fav="' + r.id + '" title="Favourite">&#9733;</button>'
-      + '<svg class="chevron' + (open ? ' open' : '') + '" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>'
+      + '<div class="flip-front-hint">TAP TO SEE RECIPE \u2192</div>'
       + '</div>'
-      + '<div class="recipe-detail">'
-      + '<div class="detail-section"><div class="detail-label label-input">INPUTS</div>'
-      + r.inputs.map(i => '<div class="detail-row"><span class="item-name">' + esc(i.item) + '</span><span class="item-qty">x' + i.qty + '</span></div>').join('')
+      + '<div class="flip-back' + (isAlt ? ' alt' : '') + '">'
+      + '<div class="flip-back-label inp">INPUTS</div>'
+      + r.inputs.map(i => '<div class="flip-back-row"><span class="name">' + esc(i.item) + '</span><span class="qty">\xd7' + i.qty + '</span></div>').join('')
+      + '<div class="flip-back-label out" style="margin-top:6px">OUTPUT</div>'
+      + r.outputs.map(o => '<div class="flip-back-row"><span class="name">' + esc(o.item) + '</span><span class="qty">\xd7' + o.qty + '</span></div>').join('')
+      + '<div class="flip-back-time">\u23f1 ' + r.time + 's craft time</div>'
       + '</div>'
-      + '<div class="detail-section"><div class="detail-label label-output">OUTPUTS</div>'
-      + r.outputs.map(o => '<div class="detail-row output-row"><span class="item-name">' + esc(o.item) + '</span><span class="item-qty">x' + o.qty + '</span></div>').join('')
-      + '</div>'
-      + '<div class="detail-stats"><div class="stat-time"><div class="stat-label">CRAFT TIME</div><div class="stat-value">' + r.time + 's</div></div></div>'
-      + (r.notes ? '<div class="recipe-notes">' + esc(r.notes) + '</div>' : '')
       + '</div></div>';
   }).join('');
 
-  list.querySelectorAll('.recipe-card').forEach(card => {
+  list.querySelectorAll('.flip-wrap').forEach(card => {
     card.addEventListener('click', e => {
-      if (e.target.closest('.fav-btn')) return;
-      const id = card.dataset.id;
-      expandedId = expandedId === id ? null : id;
-      renderRecipes(container);
+      if (e.target.closest('.flip-fav-btn')) return;
+      card.classList.toggle('flipped');
     });
   });
-  list.querySelectorAll('.fav-btn').forEach(btn => {
+  list.querySelectorAll('.flip-fav-btn').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
       const id = btn.dataset.fav;

@@ -14,6 +14,7 @@ export function openFactory(factory) {
   currentSubTab = 'plan';
   document.getElementById('detail-title').textContent = factory.name;
   document.getElementById('detail-subtitle').textContent = factory.outputItem + ' - ' + factory.outputRate + '/min';
+  updateDetailCircle();
   const detail = document.getElementById('detail-view');
   detail.classList.remove('hidden');
   requestAnimationFrame(() => detail.classList.add('visible'));
@@ -35,8 +36,40 @@ export function refreshDetail() {
   if (updated) {
     currentFactory = updated;
     document.getElementById('detail-subtitle').textContent = updated.outputItem + ' - ' + updated.outputRate + '/min';
+    updateDetailCircle();
   }
   renderSubTab(currentSubTab);
+}
+
+function updateDetailCircle() {
+  const el = document.getElementById('detail-progress-circle');
+  if (!el || !currentFactory) return;
+  const todos = currentFactory.todos || [];
+  const done = todos.filter(t => t.done).length;
+  const pct = todos.length ? Math.round(done / todos.length * 100) : 0;
+  const size = 52, r = (size - 8) / 2, cx = size / 2, cy = size / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = circ * pct / 100;
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('width', size); svg.setAttribute('height', size);
+  const bg = document.createElementNS(ns, 'circle');
+  bg.setAttribute('cx', cx); bg.setAttribute('cy', cy); bg.setAttribute('r', r);
+  bg.setAttribute('fill', 'none'); bg.setAttribute('stroke', '#2A2A2A'); bg.setAttribute('stroke-width', '4');
+  const arc = document.createElementNS(ns, 'circle');
+  arc.setAttribute('cx', cx); arc.setAttribute('cy', cy); arc.setAttribute('r', r);
+  arc.setAttribute('fill', 'none'); arc.setAttribute('stroke', '#FF6A00'); arc.setAttribute('stroke-width', '4');
+  arc.setAttribute('stroke-dasharray', dash.toFixed(2) + ' ' + circ.toFixed(2));
+  arc.setAttribute('stroke-dashoffset', (circ / 4).toFixed(2));
+  arc.setAttribute('stroke-linecap', 'round');
+  const txt = document.createElementNS(ns, 'text');
+  txt.setAttribute('x', cx); txt.setAttribute('y', String(cy + 5));
+  txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('fill', '#E8EDF5');
+  txt.setAttribute('font-size', '11'); txt.setAttribute('font-family', 'Chakra Petch,sans-serif');
+  txt.setAttribute('font-weight', '700'); txt.textContent = pct + '%';
+  svg.appendChild(bg); svg.appendChild(arc); svg.appendChild(txt);
+  el.textContent = '';
+  el.appendChild(svg);
 }
 
 function wireSubTabs() {
@@ -56,6 +89,7 @@ function wireSubTabs() {
 function switchSubTab(tab) {
   currentSubTab = tab;
   ['plan','graph','todo'].forEach(t => document.getElementById(t + '-panel').classList.toggle('hidden', t !== tab));
+  document.querySelectorAll('#detail-tabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.subtab === tab));
   renderSubTab(tab);
 }
 
@@ -88,6 +122,15 @@ function renderPlan() {
     + '<div class="summary-box"><div class="summary-title">RAW RESOURCES</div>' + rawRows + '</div>';
 
   buildTreeDOM(chain, document.getElementById('tree-root'), true, f);
+
+  const gBtn = document.createElement('button');
+  gBtn.className = 'view-graph-btn';
+  gBtn.textContent = 'View Graph \u2192';
+  gBtn.addEventListener('click', () => switchSubTab('graph'));
+  const gWrap = document.createElement('div');
+  gWrap.className = 'plan-actions';
+  gWrap.appendChild(gBtn);
+  panel.insertBefore(gWrap, panel.firstChild);
 }
 
 function buildTreeDOM(node, container, isRoot, factory) {

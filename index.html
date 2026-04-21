@@ -22,17 +22,23 @@
   </div>
   <h1>SATISFACTORY</h1>
   <div class="header-sub">Manager — <span id="sync-status">Connecting...</span></div>
+  <div class="phase-selector" id="phase-selector">
+    <button class="phase-btn" id="phase-btn">PHASE 1 ▾</button>
+    <div class="phase-dropdown hidden" id="phase-dropdown"></div>
+  </div>
 </div>
 
 <div class="tabs" id="main-tabs">
   <button class="tab-btn active" data-tab="recipes">RECIPES</button>
   <button class="tab-btn" data-tab="factories">FACTORIES</button>
+  <button class="tab-btn" data-tab="phases">PHASES</button>
   <button class="tab-btn tab-btn-new" data-tab="new">+ NEW</button>
 </div>
 
 <div id="main-view">
   <div id="recipes-panel" class="content"></div>
   <div id="factories-panel" class="content hidden"></div>
+  <div id="phases-panel" class="content hidden"></div>
 </div>
 
 <!-- NEW FACTORY MODAL -->
@@ -64,6 +70,7 @@
       <div class="detail-title" id="detail-title"></div>
       <div class="detail-subtitle" id="detail-subtitle"></div>
     </div>
+    <div id="detail-progress-circle" class="detail-progress-circle"></div>
   </div>
   <div class="tabs" id="detail-tabs">
     <button class="tab-btn active" data-subtab="plan">PLAN</button>
