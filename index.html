@@ -10,6 +10,15 @@
 <meta name="theme-color" content="#0b0e13">
 <meta name="description" content="Factory planner and progress tracker for Satisfactory — production chains, alternate recipes, power, belts and Space Elevator phases.">
 <title>Satisfactory Manager</title>
+<script>
+  // Canonical host is *.firebaseapp.com (same-origin Google sign-in). Send browser tabs on *.web.app there.
+  // Never redirect a home-screen app: leaving its origin would kick it out to Safari.
+  (function () {
+    var from = 'satisfactory-manager-c75e7.web.app', to = 'satisfactory-manager-c75e7.firebaseapp.com';
+    var standalone = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+    if (location.hostname === from && !standalone) location.replace('https://' + to + location.pathname + location.search + location.hash);
+  })();
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
