@@ -1,5 +1,5 @@
 // Offline support: network-first for the app's own files, cache-first for versioned CDN assets.
-const CACHE = 'sm-v3';
+const CACHE = 'sm-v4';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'ManlineSlabs.ttf', 'icons/icon.svg', 'icons/icon-180.png',
   'css/tokens.css', 'css/base.css', 'css/components.css', 'css/views.css',

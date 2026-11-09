@@ -4,17 +4,20 @@
 const SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
 const PROJECT_ID = 'satisfactory-manager-c75e7';
 
-// On Firebase Hosting the auth handler (/__/auth/handler) is served from the app's own origin.
-// Using that origin as authDomain keeps sign-in same-origin, which is what makes the redirect
-// flow work inside an iPad home-screen (standalone) app, where Safari partitions cross-site storage.
-export const FIREBASE_HOSTS = [`${PROJECT_ID}.web.app`, `${PROJECT_ID}.firebaseapp.com`];
-export const HOSTED_URL = `https://${PROJECT_ID}.web.app/`;
-export const isFirebaseHosted = () => FIREBASE_HOSTS.includes(location.hostname);
+// Sign-in always uses <project>.firebaseapp.com as authDomain: its /__/auth/handler is in the OAuth
+// client's default redirect list, so no Cloud Console setup is needed. The app is also *served* from
+// that host (Firebase Hosting serves both web.app and firebaseapp.com), which makes sign-in same-origin
+// there — required for the redirect flow inside an iPad home-screen (standalone) app, where Safari
+// partitions cross-site storage.
+export const AUTH_HOST = `${PROJECT_ID}.firebaseapp.com`;
+export const WEB_APP_HOST = `${PROJECT_ID}.web.app`;
+export const HOSTED_URL = `https://${AUTH_HOST}/`;
+export const isFirebaseHosted = () => location.hostname === AUTH_HOST; // same-origin auth available
 export const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
 export const firebaseConfig = {
   apiKey: 'AIzaSyD9fsh3bVME2f7hscbl2YxXihtnG8Nz7lw',
-  authDomain: isFirebaseHosted() ? location.hostname : `${PROJECT_ID}.firebaseapp.com`,
+  authDomain: AUTH_HOST,
   databaseURL: 'https://satisfactory-manager-c75e7-default-rtdb.firebaseio.com',
   projectId: PROJECT_ID,
   storageBucket: 'satisfactory-manager-c75e7.firebasestorage.app',
@@ -48,7 +51,7 @@ export async function signInWithGoogle() {
   const provider = new A.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   // Home-screen app: popups open outside the app and can't report back, so redirect instead.
-  // Only reliable when same-origin (Firebase Hosting); elsewhere we still try the popup first.
+  // Only reliable when same-origin (served from AUTH_HOST); elsewhere we still try the popup first.
   if (isStandalone() && isFirebaseHosted()) {
     await A.signInWithRedirect(auth, provider);
     return;

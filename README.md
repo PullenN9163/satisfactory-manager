@@ -192,9 +192,9 @@ The app uses Google sign-in and stores each user's data under `/users/{uid}`. **
 
 ### 🌐 Firebase Hosting (recommended for iPad home screen)
 
-The app is hosted at **https://satisfactory-manager-c75e7.web.app**. Install it from there (Safari → Share → **Add to Home Screen**).
+The app's address is **https://satisfactory-manager-c75e7.firebaseapp.com**. Install it from there (Safari → Share → **Add to Home Screen**). Browser visits to `…web.app` are forwarded to it automatically.
 
-Why: on Firebase Hosting, the app uses its own address as the Google sign-in domain. Safari keeps a home-screen app's storage separate from other sites, so signing in from a different address (such as GitHub Pages) can fail inside the home-screen app. On Firebase Hosting the sign-in page is on the same site, so it works. In home-screen mode the app signs in by redirecting rather than opening a popup.
+Why that address: Google sign-in always uses `satisfactory-manager-c75e7.firebaseapp.com` as its auth domain. That handler is already in the OAuth client's default redirect list, so it needs no Cloud Console setup. Serving the app from the *same* host keeps sign-in same-origin, which matters because Safari keeps a home-screen app's storage separate from other sites. In home-screen mode the app signs in by redirecting rather than opening a popup.
 
 **Automatic deploys:** `.github/workflows/firebase-hosting.yml` deploys every push to `main`, and each PR gets a 7-day preview URL. One-time setup:
 
