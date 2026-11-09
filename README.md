@@ -34,96 +34,35 @@ Whether you are setting up your first reinforced iron plate line or planning adv
 
 ## ✨ Features
 
+### 🏠 HUB
+Your home screen: current Space Elevator phase with live progress, the next objectives (tap to tick, or **Plan it**), recently touched factories, and empire-wide totals — buildings, power draw, open tasks and raw resource demand.
+
 ### 📖 Recipe Explorer
-
-Browse the app's collection of Satisfactory production recipes.
-
-* Search by recipe, item, or machine
-* Filter recipes by category
-* Filter recipes by unlocked tier
-* View recipe inputs, outputs, and craft times
-* Save frequently used recipes as favorites
-* Identify alternate recipes
-* Flip recipe cards to reveal production details
+* ~100 **Satisfactory 1.0** recipes, including popular alternates (Cast Screw, Heavy Encased Frame, Diluted Fuel, Pure Ingots…)
+* Search across names, inputs, outputs and machines
+* Category, tier and standard/alternate filters, aware of your current phase
+* Per-minute input/output rates on every card, favourites, and **Plan** straight from any recipe
 
 ### 🏗️ Factory Planner
+* Pick an item + target rate, with a live preview of buildings and power before you create
+* **Build list** in bottom-up order: machine count, clock %, power (using the in-game clock curve) and the belt/pipe tier each line needs
+* Switch to alternate recipes per item; everything recalculates instantly
+* Raw-resource bars, machine totals, byproducts and belt-capacity warnings
+* Collapsible production tree and an interactive **graph** (zoom / fit)
+* Edit, duplicate, and delete with undo
 
-Create and manage dedicated factory guides for your builds.
+### ✅ Build Tasks
+* Priorities, filters and progress, with a satisfying check-off
+* **Generate from plan** — one tap creates a checklist of every machine to place, every node to tap and every byproduct to handle
 
-Enter:
+### 🚀 Project Assembly
+All five Space Elevator phases with real 1.0 deliverables, objectives (each with a one-tap factory suggestion) and an advance flow. Your phase controls which recipe tiers count as unlocked.
 
-* A factory name
-* The item you want to produce
-* Your target output per minute
-
-The planner automatically calculates:
-
-* The complete production chain
-* Required items per minute
-* Machines needed at every stage
-* Total raw-resource requirements
-* Dependencies between production steps
-
-### 🔀 Alternate Recipe Support
-
-Switch between available recipes directly inside a factory plan.
-
-Changing a recipe automatically recalculates:
-
-* Required machines
-* Input materials
-* Raw-resource demand
-* The complete production chain
-* The production graph
-
-### 🕸️ Production Graphs
-
-View each factory as an interactive production network.
-
-The graph shows:
-
-* Final output items
-* Intermediate components
-* Raw resources
-* Material flow rates
-* Relationships between production steps
-
-### ✅ Factory To-Do Lists
-
-Keep track of what still needs to be built.
-
-* Add custom factory tasks
-* Assign low, medium, or high priority
-* Mark tasks as complete
-* Filter active, completed, or all tasks
-* Monitor factory completion percentage
-* Delete tasks that are no longer needed
-
-### 🚀 Project Phase Tracking
-
-Track your progress through four major development phases:
-
-1. **Structural Components**
-2. **Industrial Expansion**
-3. **Petroleum & Electronics**
-4. **Advanced Manufacturing**
-
-Each phase includes:
-
-* Recommended objectives
-* Completion tracking
-* Phase-specific recipe tiers
-* Progress percentages
-* Unlock-aware recipe filtering
-
-### ☁️ Real-Time Synchronization
-
-Firebase Realtime Database keeps important app data synchronized, including:
-
-* Saved factories
-* Factory task lists
-* Recipe selections
-* Favorite recipes
+### ☁️ Sync & offline
+* **Google sign-in** — factories, favourites, phase and objectives sync across iPad, phone and PC
+* Per-user data, locked down by Realtime Database security rules
+* Works offline (installable PWA with a service worker); a local-only mode needs no account
+* JSON export / import backup
 
 ---
 
@@ -162,21 +101,13 @@ Target Output
 
 | Technology                     | Purpose                                         |
 | ------------------------------ | ----------------------------------------------- |
-| **HTML5**                      | Application structure                           |
-| **CSS3**                       | FICSIT-inspired interface and responsive design |
-| **Vanilla JavaScript**         | Application logic and user interactions         |
-| **ES Modules**                 | Modular frontend architecture                   |
-| **Firebase Realtime Database** | Cloud synchronization and persistence           |
-| **vis-network**                | Interactive production-chain graphs             |
-| **Local Storage**              | Local phase and objective tracking              |
+| **HTML / CSS / Vanilla JS**    | ES modules, no framework, no build step         |
+| **Firebase Auth**              | Google sign-in                                  |
+| **Firebase Realtime Database** | Per-user cloud sync (`/users/{uid}`)            |
+| **vis-network**                | Interactive production graphs (lazy-loaded)     |
+| **Service worker + manifest**  | Offline use and "Add to Home Screen" on iPad    |
 
-The project has:
-
-* No frontend framework
-* No package installation requirement
-* No build process
-* No bundler
-* No backend server requirement for basic hosting
+Designed iPad-first: a navigation rail with split-view factories in landscape, and a bottom tab bar in portrait or on phones.
 
 ---
 
@@ -184,40 +115,25 @@ The project has:
 
 ```text
 satisfactory-manager/
-│
-├── index.html
-├── ManlineSlabs.ttf
-│
+├── index.html               app shell
+├── manifest.webmanifest     PWA manifest
+├── sw.js                    offline cache
+├── database.rules.json      Firebase security rules
+├── firebase.json / .firebaserc
+├── icons/                   app icons
 ├── css/
-│   └── app.css
-│
+│   ├── tokens.css           colours, type, spacing
+│   ├── base.css             layout, navigation
+│   ├── components.css       buttons, cards, sheets, toasts, rings…
+│   └── views.css            per-screen styles
 └── js/
-    ├── app.js
-    ├── factories-tab.js
-    ├── factory-detail.js
-    ├── firebase.js
-    ├── graph.js
-    ├── phase-state.js
-    ├── phases-tab.js
-    ├── planner.js
-    ├── recipes-tab.js
-    │
-    └── data/
-        └── recipes.js
+    ├── app.js               boot, auth gate, routing
+    ├── planner.js           production-chain maths
+    ├── graph.js             vis-network wrapper
+    ├── core/                firebase · store · router · ui helpers
+    ├── data/                recipes · machines · phases
+    └── views/               hub · recipes · factories · phases · settings · sign-in
 ```
-
-### Important Modules
-
-| File                | Responsibility                                       |
-| ------------------- | ---------------------------------------------------- |
-| `app.js`            | Application startup, navigation, and synchronization |
-| `planner.js`        | Production-chain calculations                        |
-| `recipes-tab.js`    | Recipe search, filters, cards, and favorites         |
-| `factories-tab.js`  | Factory creation and saved factory list              |
-| `factory-detail.js` | Plans, alternate recipes, graphs, and tasks          |
-| `phase-state.js`    | Phase definitions and local progress                 |
-| `firebase.js`       | Firebase connection and data operations              |
-| `recipes.js`        | Recipe and production data                           |
 
 ---
 
@@ -260,36 +176,30 @@ No dependency installation or build command is required.
 
 ## 🔥 Using Your Own Firebase Project
 
-The repository currently includes a Firebase configuration in:
+The app uses Google sign-in and stores each user's data under `/users/{uid}`. **One-time setup in the Firebase Console** (project `satisfactory-manager-c75e7`, or your own — update `js/core/firebase.js`):
 
-```text
-js/firebase.js
-```
+1. **Authentication → Sign-in method** → enable **Google**.
+2. **Authentication → Settings → Authorized domains** → add `pullenn9163.github.io` (plus `localhost` for local testing).
+3. **Deploy the database rules** from this repo:
+   ```bash
+   npm i -g firebase-tools
+   firebase login
+   firebase deploy --only database
+   ```
+   Or paste `database.rules.json` into **Realtime Database → Rules** and publish.
 
-To connect your own Firebase project:
+> The old version wrote to the database root with no login. Those rules usually expire after 30 days, which is why the app showed "Offline" and couldn't save. The new rules allow signed-in users to *read* the old `/factories` and `/favourites` once, so on first sign-in the app offers to import them. After importing, you can delete those two keys from the rules.
 
-1. Create a project in the Firebase Console.
-2. Add a web application to the project.
-3. Enable Firebase Realtime Database.
-4. Replace the configuration inside `js/firebase.js`.
-5. Configure appropriate Realtime Database security rules.
-6. Restart the local development server.
-
-> Firebase web configuration identifies the Firebase project, but database access must still be protected through properly configured security rules.
+If Firebase can't be reached, the app falls back to **local mode** (data stays in that browser) and offers to upload it after you sign in.
 
 ---
 
 ## 🗺️ Potential Future Improvements
 
-* [ ] User accounts and private factory profiles
-* [ ] Import and export factory plans
-* [ ] Belt and pipe capacity warnings
-* [ ] Power-consumption calculations
 * [ ] Overclocking and underclocking support
 * [ ] Production-efficiency recommendations
 * [ ] Additional alternate recipes
 * [ ] Expanded late-game phase tracking
-* [ ] Offline Progressive Web App support
 * [ ] Shareable factory-plan links
 * [ ] Factory comparison tools
 * [ ] Improved resource-node planning
