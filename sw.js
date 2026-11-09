@@ -1,5 +1,5 @@
 // Offline support: network-first for the app's own files, cache-first for versioned CDN assets.
-const CACHE = 'sm-v2';
+const CACHE = 'sm-v3';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'ManlineSlabs.ttf', 'icons/icon.svg', 'icons/icon-180.png',
   'css/tokens.css', 'css/base.css', 'css/components.css', 'css/views.css',
@@ -29,6 +29,7 @@ self.addEventListener('fetch', e => {
     return;
   }
   if (url.origin !== location.origin) return; // Firebase DB/auth traffic goes straight to the network
+  if (url.pathname.startsWith('/__/')) return; // Firebase Hosting reserved paths (auth handler, init.json)
   e.respondWith(fetch(req).then(res => {
     if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
     return res;

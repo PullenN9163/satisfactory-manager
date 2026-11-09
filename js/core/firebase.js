@@ -2,12 +2,21 @@
 // The SDK loads lazily, so the app still boots (in local mode) if gstatic can't be reached.
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
+const PROJECT_ID = 'satisfactory-manager-c75e7';
+
+// On Firebase Hosting the auth handler (/__/auth/handler) is served from the app's own origin.
+// Using that origin as authDomain keeps sign-in same-origin, which is what makes the redirect
+// flow work inside an iPad home-screen (standalone) app, where Safari partitions cross-site storage.
+export const FIREBASE_HOSTS = [`${PROJECT_ID}.web.app`, `${PROJECT_ID}.firebaseapp.com`];
+export const HOSTED_URL = `https://${PROJECT_ID}.web.app/`;
+export const isFirebaseHosted = () => FIREBASE_HOSTS.includes(location.hostname);
+export const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
 export const firebaseConfig = {
   apiKey: 'AIzaSyD9fsh3bVME2f7hscbl2YxXihtnG8Nz7lw',
-  authDomain: 'satisfactory-manager-c75e7.firebaseapp.com',
+  authDomain: isFirebaseHosted() ? location.hostname : `${PROJECT_ID}.firebaseapp.com`,
   databaseURL: 'https://satisfactory-manager-c75e7-default-rtdb.firebaseio.com',
-  projectId: 'satisfactory-manager-c75e7',
+  projectId: PROJECT_ID,
   storageBucket: 'satisfactory-manager-c75e7.firebasestorage.app',
   messagingSenderId: '172138107723',
   appId: '1:172138107723:web:8d7baf7a63d189f9684ece',
@@ -38,6 +47,12 @@ export async function signInWithGoogle() {
   const { auth, A } = await loadFirebase();
   const provider = new A.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
+  // Home-screen app: popups open outside the app and can't report back, so redirect instead.
+  // Only reliable when same-origin (Firebase Hosting); elsewhere we still try the popup first.
+  if (isStandalone() && isFirebaseHosted()) {
+    await A.signInWithRedirect(auth, provider);
+    return;
+  }
   try {
     await A.signInWithPopup(auth, provider);
   } catch (e) {
@@ -47,6 +62,12 @@ export async function signInWithGoogle() {
     }
     throw e;
   }
+}
+
+/** Surface errors from a sign-in redirect that just returned (success arrives via watchAuth). */
+export async function checkRedirectResult() {
+  if (!fb) return;
+  await fb.A.getRedirectResult(fb.auth);
 }
 
 export async function signOutUser() {

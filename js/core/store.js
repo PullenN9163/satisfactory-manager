@@ -99,6 +99,7 @@ export async function boot() {
     if (user) onSignedIn(user);
     else if (state.auth !== 'local') { state.auth = 'signedOut'; state.user = null; emit('auth'); }
   });
+  FB.checkRedirectResult().catch(e => { console.error(e); toast(FB.describeError(e), { type: 'error', duration: 8000 }); });
 }
 
 export function enterLocal(remember = true) {
