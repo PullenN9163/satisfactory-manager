@@ -1,0 +1,47 @@
+name: Firebase Hosting
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  deploy:
+    # Fork PRs can't read secrets; skip them.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SATISFACTORY_MANAGER_C75E7 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check deploy secret
+        id: secret
+        run: |
+          if [ -n "$SA" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::FIREBASE_SERVICE_ACCOUNT_SATISFACTORY_MANAGER_C75E7 is not set — skipping deploy. See README → Firebase Hosting."
+          fi
+
+      - name: Deploy preview channel (PR)
+        if: steps.secret.outputs.ok == 'true' && github.event_name == 'pull_request'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SATISFACTORY_MANAGER_C75E7 }}
+          projectId: satisfactory-manager-c75e7
+          expires: 7d
+
+      - name: Deploy live (main)
+        if: steps.secret.outputs.ok == 'true' && github.event_name == 'push'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SATISFACTORY_MANAGER_C75E7 }}
+          projectId: satisfactory-manager-c75e7
+          channelId: live

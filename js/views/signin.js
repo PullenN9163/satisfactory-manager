@@ -1,5 +1,6 @@
 import { h, icon, mount } from '../core/ui.js';
 import { signIn, enterLocal } from '../core/store.js';
+import { isStandalone, isFirebaseHosted, HOSTED_URL } from '../core/firebase.js';
 
 export function renderSignIn(el, { fbAvailable }) {
   const btn = h('button', { class: 'btn google', disabled: !fbAvailable, onclick: async () => {
@@ -21,6 +22,10 @@ export function renderSignIn(el, { fbAvailable }) {
         h('li', null, icon('rocket', 18), 'Space Elevator phase tracker')),
       btn,
       !fbAvailable ? h('p', { class: 'form-error' }, 'Can’t reach Firebase right now.') : null,
+      isStandalone() && !isFirebaseHosted() ? h('p', { class: 'note small' },
+        'Sign-in from the Home Screen works best from the Firebase-hosted app. Open ',
+        h('a', { href: HOSTED_URL, class: 'amber', target: '_blank', rel: 'noopener' }, HOSTED_URL.replace('https://', '').replace(/\/$/, '')),
+        ' in Safari, then Share → Add to Home Screen.') : null,
       h('button', { class: 'link-btn', onclick: () => enterLocal() }, 'Continue offline — this device only'),
       h('p', { class: 'muted tiny' }, 'The factory must grow.'))));
 }

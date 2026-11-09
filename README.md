@@ -179,7 +179,7 @@ No dependency installation or build command is required.
 The app uses Google sign-in and stores each user's data under `/users/{uid}`. **One-time setup in the Firebase Console** (project `satisfactory-manager-c75e7`, or your own — update `js/core/firebase.js`):
 
 1. **Authentication → Sign-in method** → enable **Google**.
-2. **Authentication → Settings → Authorized domains** → add `pullenn9163.github.io` (plus `localhost` for local testing).
+2. **Authentication → Settings → Authorized domains** → `satisfactory-manager-c75e7.web.app` and `.firebaseapp.com` are there by default. Add `pullenn9163.github.io` if you still use GitHub Pages, and `localhost` for local testing.
 3. **Deploy the database rules** from this repo:
    ```bash
    npm i -g firebase-tools
@@ -189,6 +189,24 @@ The app uses Google sign-in and stores each user's data under `/users/{uid}`. **
    Or paste `database.rules.json` into **Realtime Database → Rules** and publish.
 
 > The old version wrote to the database root with no login. Those rules usually expire after 30 days, which is why the app showed "Offline" and couldn't save. The new rules allow signed-in users to *read* the old `/factories` and `/favourites` once, so on first sign-in the app offers to import them. After importing, you can delete those two keys from the rules.
+
+### 🌐 Firebase Hosting (recommended for iPad home screen)
+
+The app is hosted at **https://satisfactory-manager-c75e7.web.app**. Install it from there (Safari → Share → **Add to Home Screen**).
+
+Why: on Firebase Hosting, the app uses its own address as the Google sign-in domain. Safari keeps a home-screen app's storage separate from other sites, so signing in from a different address (such as GitHub Pages) can fail inside the home-screen app. On Firebase Hosting the sign-in page is on the same site, so it works. In home-screen mode the app signs in by redirecting rather than opening a popup.
+
+**Automatic deploys:** `.github/workflows/firebase-hosting.yml` deploys every push to `main`, and each PR gets a 7-day preview URL. One-time setup:
+
+1. In Google Cloud Console → IAM → Service accounts (project `satisfactory-manager-c75e7`), create a service account with the role **Firebase Hosting Admin**, then create a JSON key for it.
+   *Or* run `firebase init hosting:github` locally and let it create the account and secret for you. If it offers to write workflow files, decline, because this repo already has one.
+2. In the GitHub repo → Settings → Secrets and variables → Actions, add a secret named **`FIREBASE_SERVICE_ACCOUNT_SATISFACTORY_MANAGER_C75E7`** containing the JSON key.
+
+Until that secret exists, the workflow skips the deploy instead of failing.
+
+**Manual deploy:** `firebase deploy --only hosting,database` (this also publishes the database rules).
+
+Only app files are uploaded; `README.md`, the Firebase config files and all dot-folders (`.git`, `.github`) are excluded by `firebase.json`.
 
 If Firebase can't be reached, the app falls back to **local mode** (data stays in that browser) and offers to upload it after you sign in.
 
