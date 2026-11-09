@@ -1,108 +1,83 @@
-import { startSync, onSyncStatus, appData } from './firebase.js';
-import { initRecipesTab, refreshRecipesTab } from './recipes-tab.js';
-import { initFactoriesTab, refreshFactoriesTab, initNewFactoryModal } from './factories-tab.js';
-import { openFactory, closeFactory, refreshDetail } from './factory-detail.js';
-import { initPhasesTab, refreshPhasesTab } from './phases-tab.js';
-import { getPhase, setPhase, onPhaseChange, PHASE_DEFS } from './phase-state.js';
+import { h, icon, mount } from './core/ui.js';
+import { boot, subscribe, getState } from './core/store.js';
+import { onRoute, start, current, go } from './core/router.js';
+import { createHub } from './views/hub.js';
+import { createRecipes } from './views/recipes.js';
+import { createFactories } from './views/factories.js';
+import { createPhases } from './views/phases.js';
+import { createSettings } from './views/settings.js';
+import { renderSignIn } from './views/signin.js';
+import { openNewFactory } from './views/new-factory.js';
 
-let currentTab = 'recipes';
-const recipesPanel = document.getElementById('recipes-panel');
-const factoriesPanel = document.getElementById('factories-panel');
-const phasesPanel = document.getElementById('phases-panel');
-const syncEl = document.getElementById('sync-status');
+const VIEWS = { hub: createHub, recipes: createRecipes, factories: createFactories, phases: createPhases, settings: createSettings };
+const NAV = [
+  ['hub', 'HUB', 'hub'], ['recipes', 'Recipes', 'book'], ['factories', 'Factories', 'factory'], ['phases', 'Phases', 'rocket'], ['settings', 'Settings', 'gear'],
+];
+const SYNC_LABEL = { online: 'Synced', connecting: 'Connecting', offline: 'Offline', denied: 'No access', local: 'Local' };
 
-// Tab switching
-document.querySelectorAll('#main-tabs .tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    if (btn.dataset.tab === 'new') { newModal.open(); return; }
-    switchTab(btn.dataset.tab);
-  });
-});
+const appEl = document.getElementById('app');
+const navEl = document.getElementById('nav');
+const viewEl = document.getElementById('view');
+const gateEl = document.getElementById('gate');
+let active = null; // { name, view }
 
-function switchTab(tab) {
-  currentTab = tab;
-  document.querySelectorAll('#main-tabs .tab-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.tab === tab && tab !== 'new')
-  );
-  recipesPanel.classList.toggle('hidden', tab !== 'recipes');
-  factoriesPanel.classList.toggle('hidden', tab !== 'factories');
-  phasesPanel.classList.toggle('hidden', tab !== 'phases');
-  if (tab === 'phases') refreshPhasesTab();
+function renderNav(route) {
+  const st = getState();
+  mount(navEl,
+    h('div', { class: 'nav-brand' }, h('img', { src: 'icons/icon.svg', alt: '', width: 36, height: 36 }), h('span', { class: 'nav-brand-text' }, 'SATISFACTORY', h('small', null, 'MANAGER'))),
+    h('div', { class: 'nav-items' },
+      NAV.slice(0, 3).map(n => navItem(n, route)),
+      h('button', { class: 'nav-new', 'aria-label': 'New factory', onclick: () => openNewFactory() }, h('span', { class: 'nav-new-btn' }, icon('plus', 24)), h('span', { class: 'nav-label' }, 'New')),
+      NAV.slice(3).map(n => navItem(n, route))),
+    h('button', { class: 'nav-sync sync-' + st.sync, onclick: () => go('settings'), title: SYNC_LABEL[st.sync] },
+      st.user && st.user.photo ? h('img', { class: 'nav-avatar', src: st.user.photo, alt: '', referrerPolicy: 'no-referrer' }) : null,
+      h('span', { class: 'dot' }), h('span', { class: 'nav-label' }, SYNC_LABEL[st.sync])));
+}
+function navItem([key, label, ic], route) {
+  const on = route.view === key;
+  return h('a', { class: 'nav-item' + (on ? ' on' : ''), href: '#/' + key, 'aria-current': on ? 'page' : null }, icon(ic, 22), h('span', { class: 'nav-label' }, label));
 }
 
-// Phase selector
-function renderPhaseDropdown() {
-  const phase = getPhase();
-  const btn = document.getElementById('phase-btn');
-  if (btn) btn.textContent = 'PHASE ' + phase + ' \u25be';
-  const dd = document.getElementById('phase-dropdown');
-  if (!dd) return;
-  dd.textContent = '';
-  PHASE_DEFS.forEach(p => {
-    const opt = document.createElement('div');
-    opt.className = 'phase-option' + (p.id === phase ? ' active' : '');
-    opt.dataset.pid = p.id;
-    const nameEl = document.createElement('div');
-    nameEl.className = 'phase-option-name';
-    nameEl.textContent = p.name;
-    const subEl = document.createElement('div');
-    subEl.className = 'phase-option-sub';
-    subEl.textContent = p.subtitle;
-    opt.appendChild(nameEl); opt.appendChild(subEl);
-    opt.addEventListener('click', () => {
-      setPhase(parseInt(opt.dataset.pid));
-      dd.classList.add('hidden');
-    });
-    dd.appendChild(opt);
-  });
+function show(route) {
+  const st = getState();
+  if (st.auth === 'loading') return;
+  if (st.auth === 'signedOut') {
+    appEl.classList.add('hidden'); gateEl.classList.remove('hidden');
+    if (active) { active.view.destroy?.(); active = null; }
+    renderSignIn(gateEl, st);
+    return;
+  }
+  gateEl.classList.add('hidden'); appEl.classList.remove('hidden');
+  const name = VIEWS[route.view] ? route.view : 'hub';
+  renderNav({ view: name });
+  document.body.dataset.view = name;
+  if (!active || active.name !== name) {
+    active?.view.destroy?.();
+    viewEl.textContent = '';
+    const container = h('div', { class: 'view-root view-' + name });
+    viewEl.appendChild(container);
+    viewEl.scrollTop = 0;
+    active = { name, view: VIEWS[name](container) };
+    active.view.route?.(route);
+    active.view.update(st, 'mount');
+    container.classList.add('enter');
+  } else {
+    active.view.route?.(route);
+  }
+  document.title = (name === 'hub' ? 'HUB' : name[0].toUpperCase() + name.slice(1)) + ' · Satisfactory Manager';
 }
 
-const phaseBtn = document.getElementById('phase-btn');
-const phaseDd = document.getElementById('phase-dropdown');
-phaseBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  renderPhaseDropdown();
-  phaseDd.classList.toggle('hidden');
+subscribe((st, reason) => {
+  document.getElementById('splash')?.remove();
+  if (reason === 'auth') { show(current()); return; }
+  renderNav({ view: active ? active.name : 'hub' });
+  if (active) active.view.update(st, reason);
 });
-document.addEventListener('click', () => phaseDd.classList.add('hidden'));
+onRoute(show);
 
-onPhaseChange(() => {
-  renderPhaseDropdown();
-  refreshRecipesTab(recipesPanel);
-  refreshPhasesTab();
-});
+boot().then(() => start());
+start();
 
-renderPhaseDropdown();
-
-// Sync status
-onSyncStatus(status => {
-  syncEl.textContent = status === 'ok' ? 'Synced' : 'Offline';
-  syncEl.className = status === 'ok' ? 'sync-ok' : 'sync-err';
-});
-
-// Back button
-document.getElementById('back-btn').addEventListener('click', () => {
-  closeFactory();
-  switchTab('factories');
-});
-
-// New factory modal
-const newModal = initNewFactoryModal(factory => {
-  switchTab('factories');
-  openFactory(factory);
-});
-
-// Init tabs
-initRecipesTab(recipesPanel);
-initFactoriesTab(factoriesPanel, factory => openFactory(factory));
-initPhasesTab(phasesPanel);
-
-// Firebase — re-render on every remote change
-startSync(() => {
-  if (currentTab === 'recipes') refreshRecipesTab(recipesPanel);
-  if (currentTab === 'factories') refreshFactoriesTab(factoriesPanel);
-  if (currentTab === 'phases') refreshPhasesTab();
-  refreshDetail();
-});
-
-switchTab('recipes');
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}

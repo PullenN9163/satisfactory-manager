@@ -1,0 +1,26 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "phase": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
+        "objectives": { "$oid": { ".validate": "newData.isBoolean()" } },
+        "favourites": { "$i": { ".validate": "newData.isString() && newData.val().length < 64" } },
+        "factories": {
+          "$fid": {
+            ".validate": "newData.hasChildren(['id', 'name', 'outputItem', 'outputRate']) && newData.child('id').val() === $fid",
+            "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80" },
+            "outputItem": { ".validate": "newData.isString() && newData.val().length <= 80" },
+            "outputRate": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() < 1000000" },
+            "notes": { ".validate": "newData.isString() && newData.val().length <= 2000" }
+          }
+        }
+      }
+    },
+    "factories": { ".read": "auth != null" },
+    "favourites": { ".read": "auth != null" }
+  }
+}
